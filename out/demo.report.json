@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "issues": [],
+  "metrics": {
+    "fidelity_numbers": 1.0,
+    "fidelity_tables": 1.0,
+    "stub_validator": 1.0,
+    "repair_iterations": 0.0,
+    "fallback_used": 1.0,
+    "slides": 6.0
+  }
+}

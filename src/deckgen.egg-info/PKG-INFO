@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: deckgen
+Version: 0.1.0
+Requires-Python: >=3.10
+Requires-Dist: python-pptx>=1.0.2
+Requires-Dist: pydantic>=2.6
+Requires-Dist: httpx>=0.27
+Requires-Dist: pyyaml
+Requires-Dist: pillow
+Requires-Dist: fastapi
+Requires-Dist: uvicorn[standard]
+Requires-Dist: sse-starlette
+Requires-Dist: python-multipart
+Requires-Dist: typer
+Requires-Dist: pytest
+Requires-Dist: fonttools
