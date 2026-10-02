@@ -2,6 +2,6 @@
 | ID | Владелец | Задача | Статус |
 |---|---|---|---|
 | BA-1..BA-6 | BA | см. tasks/04_BA.md | ⬜ |
-| ML1-1..ML1-6 | ML1 | см. tasks/01_ML1.md | ⬜ |
+| ML1-1..ML1-6 | ML1 | см. tasks/01_ML1.md — ML1-1 ✅ LLMClient (3 режима, repair, ретраи, лог) | 🔄 |
 | ML2-1..ML2-6 | ML2 | см. tasks/02_ML2.md | ⬜ |
 | FS-1..FS-6 | FS | см. tasks/03_FS.md | ⬜ |
