@@ -1,0 +1,8 @@
+[
+  {"name": "gpt-oss-120b", "model": "gpt-oss-120b", "reasoning_effort": "low"},
+  {"name": "qwen3.6-35b-a3b", "model": "qwen3.6-35b-a3b",
+   "extra_body": {"chat_template_kwargs": {"enable_thinking": false}}},
+  {"name": "yandexgpt", "model": "gpt://<folder_id>/yandexgpt/latest",
+   "base_url": "https://ai.api.cloud.yandex.net/v1", "api_key_env": "YANDEX_API_KEY",
+   "auth_scheme": "Api-Key", "extra_headers": {"OpenAI-Project": "<folder_id>"}, "structured_mode": "json_schema"}
+]
