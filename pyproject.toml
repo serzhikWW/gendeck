@@ -1,0 +1,9 @@
+[project]
+name = "deckgen"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["python-pptx>=1.0.2","pydantic>=2.6","httpx>=0.27","pyyaml","pillow","fastapi","uvicorn[standard]","sse-starlette","python-multipart","typer","pytest","fonttools"]
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
