@@ -204,3 +204,18 @@ def test_real_socket_server(tmp_path):
         assert LLMClient(cfg).generate(MSG, Item).value == "12,4"
     finally:
         srv.shutdown()
+
+
+def test_yandex_style_config(tmp_path):
+    """ML1-6: конфигурация Yandex AI Studio — только env/конфиг, код тот же."""
+    rec = Recorder(httpx.Response(400, json={"error": {"message": "unsupported response_format"}}),
+                   _resp('{"name": "a", "value": "b"}'))
+    cfg = _cfg(tmp_path, base_url="https://ai.api.cloud.yandex.net/v1", model="gpt://b1gfolder/yandexgpt/latest",
+               auth_scheme="Api-Key", extra_headers={"OpenAI-Project": "b1gfolder"})
+    client = _client(cfg, rec)
+    assert client.generate(MSG, Item).value == "b"
+    first = rec.requests[0]
+    assert first["url"] == "https://ai.api.cloud.yandex.net/v1/chat/completions"
+    assert first["headers"]["authorization"] == "Api-Key k" and first["headers"]["openai-project"] == "b1gfolder"
+    assert first["body"]["model"] == "gpt://b1gfolder/yandexgpt/latest" and "reasoning_effort" not in first["body"]
+    assert client.effective_mode == "json_object"  # json_schema не поддержан -> понижение без правок кода

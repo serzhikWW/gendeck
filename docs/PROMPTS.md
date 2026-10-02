@@ -96,6 +96,33 @@ planner-v1
 Ниже твой предыдущий план и замечания автоматической проверки. Исправь ТОЛЬКО указанные проблемы, остальное оставь как было. Число, которого нет в источнике, удали или замени дословным из источника; для каждого числа из прозы добавь evidence.quote — точную цитату; длинные тексты сократи или раздели слайд. Верни полный исправленный DeckPlan.
 ```
 
+## Смена модели и провайдера (ML1-6: YandexGPT / Alice AI через OpenAI-совместимый эндпоинт)
+
+Тот же `LLMClient`, код не меняется — только `.env`:
+
+| Провайдер | LLM_BASE_URL | LLM_MODEL | Авторизация | Особенности |
+|---|---|---|---|---|
+| vLLM / провайдер gpt-oss | `https://<host>/v1` | `gpt-oss-120b` | `LLM_AUTH_SCHEME=Bearer` | `LLM_REASONING_EFFORT=low` — короче reasoning, быстрее ответ |
+| Qwen3.x (vLLM) | `https://<host>/v1` | `qwen3.6-35b-a3b` (имя как на сервере) | Bearer | отключить thinking: `LLM_EXTRA_BODY={"chat_template_kwargs": {"enable_thinking": false}}`, `LLM_REASONING_EFFORT=` (пусто) |
+| Yandex AI Studio | `https://ai.api.cloud.yandex.net/v1` (старый адрес Completions: `https://llm.api.cloud.yandex.net/v1`) | `gpt://<folder_id>/yandexgpt/latest` (и др. модели каталога в формате `gpt://<folder_id>/<model>`) | `LLM_AUTH_SCHEME=Api-Key`, `LLM_API_KEY=<API-ключ сервисного аккаунта>`, `LLM_EXTRA_HEADERS={"OpenAI-Project": "<folder_id>"}` | см. ниже |
+
+Различия Yandex, которые учтены или требуют проверки на живом ключе:
+- **Авторизация.** В документации Yandex — заголовок `Authorization: Api-Key <ключ>`; официальные примеры с OpenAI SDK
+  передают ключ стандартно и folder_id через `project` (= заголовок `OpenAI-Project`). Клиент поддерживает оба варианта
+  (`LLM_AUTH_SCHEME`, `LLM_EXTRA_HEADERS`). Тест: `tests/test_llm_client.py::test_yandex_style_config`.
+- **Structured output.** Chat Completions в Yandex совместим с OpenAI частично; в справочнике API упомянуты
+  `response_format` типов json_schema и json_object. Начинать с `LLM_STRUCTURED_MODE=json_schema`; если эндпоинт ответит
+  400 на `response_format`, клиент сам понизит режим до `json_object` → `prompt_only` (видно в `out/llm_log.jsonl`, поле `mode`).
+- **reasoning_effort** не отправлять (`LLM_REASONING_EFFORT=` пусто), пока не подтверждена поддержка: неизвестный
+  параметр может дать 400 (тогда он отбросится только вместе с `response_format`, поэтому лучше не задавать).
+- **Контекст.** Окно у YandexGPT меньше, чем у gpt-oss-120b (128k) — для длинных входов уменьшить
+  `PLANNER_CHUNK_CHARS` (например, до 6000), чтобы map-reduce резал источник на меньшие части.
+- **Данные.** Для конфиденциальных документов — модель в своём контуре (vLLM) или Yandex с договором; код один и тот же.
+
+**Не проверено на живом ключе (на 2026-10-03 ключа у команды нет):** фактическая поддержка `json_schema` у выбранной
+модели Yandex, лимиты RPS, точное окно контекста. Как появится ключ: `python scripts/eval_models.py --models-file scripts/models.example.json`
+и записать результат в `docs/MODEL_COMPARISON.md`.
+
 ## Журнал версий
 | Версия | Дата | Изменение |
 |---|---|---|
