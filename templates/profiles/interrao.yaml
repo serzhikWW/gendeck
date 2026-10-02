@@ -1,0 +1,79 @@
+# YAML-профиль корпоративного шаблона ИнтерРАО (режим `profile`).
+# В макетах шаблона только заголовок, остальное — свободные фигуры, поэтому слайды
+# строятся клонированием слайдов-образцов (sample_slide, 1-based как в PowerPoint).
+# Все координаты в EMU, сняты с реальных слайдов шаблона (см. docs/ENGINE_NOTES.md).
+# Поле: name (логическое), kind (title|subtitle|text|table), bbox [x, y, w, h], font_pt,
+#   shape — имя фигуры на слайде-образце, которую заполняем (иначе рендерер создаёт TextBox),
+#   placeholder_idx — если поле = плейсхолдер макета (заголовок idx 0).
+template: interrao_corporate.pptx
+match:
+  slide_w: 13430250
+  slide_h: 7561263
+  layout_names: ["1_Заголовок и объект", "1_Титульный слайд"]
+
+style:
+  font_family: Liberation Sans
+  title_pt: 24          # заголовок слайда (образцы 8, 9)
+  body_pt_max: 12       # основной текст (гайд, слайд 6)
+  body_pt_min: 10
+  table_pt_max: 12      # таблицы (образцы 8, 9)
+  table_pt_min: 8
+
+# Цвета (RRGGBB) из гайда (слайд 6) и таблиц-образцов (слайды 8, 9).
+colors:
+  title: "003264"         # тёмно-синий заголовков
+  title_slide: "003D80"   # название презентации на титуле
+  text: "000000"
+  accent: "F08800"        # оранжевый: буллеты, акцентные цифры
+  table_header_text: "F18400"
+  table_header_fill: "F2F2F2"   # bg1 lumMod 95%
+  table_border: "D9D9D9"        # bg1 lumMod 85%
+  table_band_fill: ""           # зебры в корп. таблицах нет
+  note: "7F7F7F"
+
+text:                   # параметры буллетов (TextBox 36, слайд 9)
+  ln_spc: 0.9
+  space_after_pt: 6
+  bullet_char: "•"
+  bullet_indent_emu: 171444
+
+layouts:
+  - id: interrao_title
+    slide_type: title
+    sample_slide: 1
+    fields:
+      - {name: TITLE, kind: title, shape: "TextBox 1", bbox: [1000000, 3150000, 11430250, 1300000], font_pt: 40}
+      - {name: SUBTITLE, kind: subtitle, shape: "TextBox 2", bbox: [1000000, 4520000, 11430250, 1250000], font_pt: 16, required: false}
+
+  - id: interrao_section
+    slide_type: section
+    sample_slide: 2
+    fields:
+      - {name: TITLE, kind: title, placeholder_idx: 0, bbox: [0, 3699426, 13430250, 692227], font_pt: 32}
+
+  - id: interrao_slide
+    slide_type: slide
+    sample_slide: 3
+    fields:
+      - {name: TITLE, kind: title, placeholder_idx: 0, bbox: [548457, 254782, 11509530, 409868], font_pt: 24}
+      - {name: TEXT, kind: text, bbox: [548457, 884890, 12219181, 6150000], font_pt: 12}
+
+  - id: interrao_table_text
+    slide_type: table
+    sample_slide: 3
+    fields:
+      - {name: TITLE, kind: title, placeholder_idx: 0, bbox: [548457, 254782, 11509530, 409868], font_pt: 24}
+      - {name: TEXT, kind: text, bbox: [548457, 884890, 4200000, 6150000], font_pt: 12}
+      - {name: TABLE, kind: table, bbox: [4950000, 884890, 7817638, 6150000], font_pt: 12}
+
+  - id: interrao_table_only
+    slide_type: table
+    sample_slide: 3
+    fields:
+      - {name: TITLE, kind: title, placeholder_idx: 0, bbox: [548457, 254782, 11509530, 409868], font_pt: 24}
+      - {name: TABLE, kind: table, bbox: [548457, 884890, 12219181, 6150000], font_pt: 12}
+
+  - id: interrao_last
+    slide_type: last
+    sample_slide: 28        # «Спасибо за внимание!» зашито в макет «2_Заголовок раздела»
+    fields: []
