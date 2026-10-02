@@ -5,7 +5,9 @@ import re
 _WS = re.compile(r"[\s\u00a0\u202f\u2009\u2007]+")
 # "1 234,5" (группы по 3 через пробел/nbsp) | "19,1" | "2024" | "12.4"
 NUM_RE = re.compile(r"\d{1,3}(?:[ \u00a0\u202f\u2009]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?")
-_SENT_SPLIT = re.compile(r"(?<=[.!?…;])\s+|\n+")
+# граница предложения: знак конца + пробел + заглавная/цифра/кавычка ("млн руб. при плане" не режется)
+_SENT_SPLIT = re.compile(r"(?<=[.!?…;])\s+(?=[«\"(A-ZА-ЯЁ0-9])|\n+")
+_WORD = re.compile(r"[A-Za-zА-Яа-яЁё]{3,}")
 _QUOTE_STRIP = re.compile(r"^[\s#>*•\-–—]+")
 
 
@@ -38,14 +40,19 @@ def sentences(raw: str) -> list[str]:
     return out
 
 
-def find_quote(tokens: list[str], raw: str, _cache: dict | None = None) -> list[str]:
+def _overlap(a: str, b: str) -> int:
+    wa = {w.lower() for w in _WORD.findall(a)}
+    return sum(1 for w in {w.lower() for w in _WORD.findall(b)} if w in wa)
+
+
+def find_quote(tokens: list[str], raw: str, context: str = "") -> list[str]:
     """Минимальный набор дословных фрагментов источника, покрывающий все токены.
-    Предпочтение: один фрагмент со всеми числами, проза раньше строк таблиц, короче — лучше."""
+    Ранжирование: больше общих слов с текстом слайда (context), проза раньше строк таблиц, короче — лучше."""
     if not tokens:
         return []
     sents = sentences(raw)
     def key(s: str):
-        return ("|" in s, len(s))
+        return (-_overlap(s, context), "|" in s, len(s))
     full = sorted((s for s in sents if all(number_in_source(t, s) for t in tokens)), key=key)
     if full:
         return [full[0]]

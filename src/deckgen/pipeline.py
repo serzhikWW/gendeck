@@ -9,7 +9,10 @@
   рендерится лучший план (с наименьшим числом ошибок), в отчёт добавляется warning.
 """
 from __future__ import annotations
+import importlib
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Optional
 
 from .contracts import *
@@ -122,3 +125,59 @@ def run(text: str, template_path: str, out_path: str, m: Modules,
                            "slides": float(len(deck.slides))})
     emit("done", {"ok": report.ok, "out": out_path})
     return report, plan
+
+
+# ---------- сборка модулей (используют cli.py, api/, scripts/eval_models.py) ----------
+REPO_ROOT = Path(__file__).resolve().parents[2]
+_ROLES = {"profiler": "template", "ingestor": "ingest", "fitter": "fitter", "renderer": "renderer",
+          "validator": "validator"}
+
+
+def _resolve(role: str):
+    """1) env DECKGEN_<ROLE>="pkg.module:factory"; 2) deckgen.<pkg>.create(); 3) временная заглушка из stubs.py.
+    Возвращает (экземпляр, источник)."""
+    spec = os.getenv(f"DECKGEN_{role.upper()}")
+    if spec:
+        mod, _, attr = spec.partition(":")
+        return getattr(importlib.import_module(mod), attr or "create")(), spec
+    pkg = importlib.import_module(f"deckgen.{_ROLES[role]}")
+    if hasattr(pkg, "create"):
+        return pkg.create(), f"deckgen.{_ROLES[role]}.create"
+    from . import stubs
+    cls = {"profiler": stubs.StubProfiler, "ingestor": stubs.StubIngestor, "fitter": stubs.StubFitter,
+           "renderer": stubs.StubRenderer, "validator": stubs.StubValidator}[role]
+    return cls(), f"stub:{cls.__name__}"
+
+
+def load_gold_examples(ingestor: Ingestor, data_dir: Optional[Path] = None) -> list[tuple[IngestResult, DeckPlan]]:
+    """data/gold/NN_name.plan.json + data/samples/NN_name.(md|txt) -> few-shot для планировщика."""
+    data_dir = data_dir or Path(os.getenv("DECKGEN_DATA_DIR", REPO_ROOT / "data"))
+    out = []
+    for gp in sorted((data_dir / "gold").glob("*.plan.json")):
+        stem = gp.name[:-len(".plan.json")]
+        sample = next((p for ext in (".md", ".txt") for p in [data_dir / "samples" / (stem + ext)] if p.is_file()), None)
+        if sample is None:
+            continue
+        try:
+            out.append((ingestor.ingest(sample.read_text(encoding="utf-8")),
+                        DeckPlan.model_validate_json(gp.read_text(encoding="utf-8"))))
+        except Exception:
+            continue  # битый эталон не должен ломать генерацию
+    return out
+
+
+def default_modules(use_llm: bool = True, llm_client=None) -> tuple[Modules, dict[str, str]]:
+    """Собирает Modules; второй элемент — откуда взят каждый модуль (для лога CLI/UI)."""
+    from .planner import LLMPlanner
+    resolved = {role: _resolve(role) for role in _ROLES}
+    sources = {role: src for role, (_, src) in resolved.items()}
+    ingestor = resolved["ingestor"][0]
+    if use_llm:
+        planner: Planner = LLMPlanner(llm_client, gold_examples=load_gold_examples(ingestor))
+        sources["planner"] = "LLMPlanner"
+    else:
+        planner = FallbackPlanner()
+        sources["planner"] = "FallbackPlanner (--no-llm)"
+    return Modules(profiler=resolved["profiler"][0], ingestor=ingestor, planner=planner,
+                   fitter=resolved["fitter"][0], renderer=resolved["renderer"][0],
+                   validator=resolved["validator"][0]), sources

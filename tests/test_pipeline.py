@@ -183,3 +183,26 @@ def test_plan_without_llm_respects_bullet_limit():
 
 def test_fallback_planner_protocol():
     assert FallbackPlanner().plan(SRC, CATALOG).slides
+
+
+def test_sentences_do_not_split_on_abbreviations():
+    from deckgen.planner.numbers import sentences
+    assert sentences("Затраты 1 234,5 млн руб. при плане 1 300,0 млн руб. Аварийность снизилась.") == [
+        "Затраты 1 234,5 млн руб. при плане 1 300,0 млн руб.", "Аварийность снизилась."]
+
+
+def test_find_quote_prefers_context_overlap():
+    from deckgen.planner.numbers import find_quote
+    raw = "Задачи на 2025 год\nДокладчик: заместитель директора, февраль 2025 г."
+    assert find_quote(["2025"], raw, "Заместитель директора, февраль 2025 г.") == [
+        "Докладчик: заместитель директора, февраль 2025 г."]
+
+
+def test_fallback_table_caption_not_a_bullet():
+    from deckgen.cli import DEMO_TEXT
+    from deckgen.stubs import StubIngestor
+    src = StubIngestor().ingest(DEMO_TEXT)
+    plan = plan_without_llm(src, CATALOG)
+    assert not any("Таблица 1." in b for s in plan.slides for b in s.bullets)
+    t = next(s for s in plan.slides if s.table)
+    assert t.title == "Основные показатели, план-факт" and not t.evidence

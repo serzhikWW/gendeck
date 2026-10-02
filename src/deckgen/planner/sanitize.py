@@ -37,7 +37,7 @@ def add_evidence(s: SlideSpec, raw: str) -> None:
         uncovered = [t for t in toks if not any(number_in_source(t, e.quote) for e in s.evidence)]
         if not uncovered:
             continue
-        for q in find_quote(uncovered, raw):
+        for q in find_quote(uncovered, raw, text):
             if not any(e.quote == q for e in s.evidence):
                 s.evidence.append(Evidence(quote=q))
 

@@ -1,6 +1,7 @@
 """План без LLM (деградация): секции -> слайды с буллетами-предложениями источника, таблицы -> table-слайды.
 Текст копируется дословно, поэтому числа не искажаются; evidence — те же фрагменты источника."""
 from __future__ import annotations
+import re
 from typing import Optional
 
 from ..contracts import DeckPlan, IngestResult, Issue, SlideSpec, SlideType, TableSpec, TemplateCatalog
@@ -11,9 +12,18 @@ from .sanitize import sanitize
 CONT = " (продолжение)"
 
 
-def _bullets(text: str) -> list[str]:
-    lines = [l for l in (text or "").splitlines() if not l.lstrip().startswith("|")]
+_TABLE_PREFIX = re.compile(r"^\s*Таблица\s+\d+[.:]?\s*", re.I)
+
+
+def _bullets(text: str, captions: set[str]) -> list[str]:
+    """Предложения секции без строк таблиц и без подписей таблиц (они станут заголовками table-слайдов)."""
+    lines = [l for l in (text or "").splitlines()
+             if not l.lstrip().startswith("|") and l.strip() not in captions]
     return sentences("\n".join(lines))
+
+
+def _table_title(caption: str, fallback: str) -> str:
+    return _TABLE_PREFIX.sub("", caption).strip() or caption.strip() or fallback
 
 
 def _default_catalog() -> TemplateCatalog:
@@ -47,12 +57,13 @@ def plan_without_llm(src: IngestResult, catalog: Optional[TemplateCatalog] = Non
     slides = [SlideSpec(type=SlideType.title, title=deck_title, subtitle=subtitle)]
     for sec in sections:
         title = sec.heading or deck_title
-        bl = _bullets(sec.text)
+        caps = {tables[t].caption.strip() for t in sec.table_ids if t in tables and tables[t].caption.strip()}
+        bl = _bullets(sec.text, caps)
         for k in range(0, len(bl), max_b):
             slides.append(SlideSpec(type=SlideType.slide, title=title + (CONT if k else ""), bullets=bl[k:k + max_b]))
         for tid in sec.table_ids:
             if tid in tables:
-                slides.append(SlideSpec(type=SlideType.table, title=tables[tid].caption or title,
+                slides.append(SlideSpec(type=SlideType.table, title=_table_title(tables[tid].caption, title),
                                         table=TableSpec(source_id=tid)))
     plan, _ = sanitize(DeckPlan(deck_title=deck_title, slides=slides), src, catalog)  # evidence, титул/финал, все таблицы
     return plan
