@@ -109,4 +109,6 @@ def test_measure_helpers():
     grid, hn = table_grid(TableSpec(columns=["a", "b"], rows=[["1"], ["2", "3"]]))
     assert grid == [["a", "b"], ["1", ""], ["2", "3"]] and hn == 1
     tl = layout_table(grid, hn, 914400 * 4, 12)
-    assert sum(tl.col_w) == 914400 * 4 and len(tl.row_h) == 3
+    assert 914400 * 2 <= sum(tl.col_w) <= 914400 * 4 and len(tl.row_h) == 3
+    wide = layout_table([["Очень длинный текст ячейки " * 6] * 3], 0, 914400 * 4, 12)
+    assert sum(wide.col_w) == 914400 * 4  # большой таблице — вся зона

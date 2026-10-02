@@ -22,8 +22,9 @@ from deckgen.template.profile import Profile, find_profile
 from deckgen.template.textstyle import (BULLET_CHAR, BULLET_MARL_EMU, LN_SPC, PARA_SPACE_RATIO,
                                         TEXT_INSETS_EMU)
 
-from . import ops
+from . import ops, package
 from .tables import TableStyle, fill_table
+from .tablestyle import resolve_table_style
 
 _CONTENT = (SlideType.slide, SlideType.table)
 _DEFAULT_BULLET = "F08800"
@@ -50,6 +51,9 @@ class PptxRenderer:
             ops.remove_empty_placeholders(s)
         ops.strip_autofit_everywhere(prs)
         ops.renumber(prs)
+        package.unify_fonts(prs)
+        package.drop_thumbnail(prs)
+        package.rewrite_app_props(prs)
         first_title = next((s.spec.title for s in deck.slides if s.spec.type == SlideType.title), None)
         if first_title:
             prs.core_properties.title = first_title[:255]
@@ -76,7 +80,16 @@ class _Ctx:
                             header_text=self.color("table_header_text"), header_fill=self.color("table_header_fill"),
                             band_fill=self.color("table_band_fill"), border=self.color("table_border", "D9D9D9"))
         else:
-            st = TableStyle(style_id=_template_table_style(self.prs, lspec.layout_id))
+            sid = _template_table_style(self.prs, lspec.layout_id)
+            rs = resolve_table_style(self.prs, sid)
+            if rs is not None:
+                st = TableStyle(style_id=sid, header_text=rs.header_text, header_fill=rs.header_fill,
+                                header_bold=rs.header_bold, header_rule=rs.header_rule, body_text=rs.body_text,
+                                band_fill=rs.band_fill, grid=rs.grid)
+            elif sid:
+                st = TableStyle(style_id=sid, explicit=False)  # встроенный стиль Office: знают все редакторы
+            else:  # в шаблоне нет ни STYLE_TABLE, ни стилей — нейтральный вид
+                st = TableStyle(header_fill="F2F2F2", border="BFBFBF")
         self._style_cache[lspec.layout_id] = st
         return st
 
@@ -165,6 +178,23 @@ class _SlideWriter:
             elif f.kind == FieldKind.subtitle and self.spec.subtitle:
                 self._write_plain(f, self.spec.subtitle, self.font(f, st.body_pt_max), title=False)
                 subtitle_written = True
+            elif f.kind in (FieldKind.title, FieldKind.subtitle):
+                self._drop_sample_shape(f)
+        self._subtitle_written = subtitle_written
+        self._write_content()
+
+    def _drop_sample_shape(self, f: FieldSpec) -> None:
+        """Поле не заполняется, а на клоне образца стоит его фигура с текстом-примером («Докладчик: ФИО») — убрать."""
+        if f.kind not in (FieldKind.title, FieldKind.subtitle, FieldKind.text):
+            return
+        name = self._profile_field(f).get("shape")
+        sh = self._shape_by_name(name) if name else None
+        if sh is not None:
+            sh._element.getparent().remove(sh._element)
+
+    def _write_content(self) -> None:
+        st = self.ctx.catalog.style
+        subtitle_written = self._subtitle_written
         has_table = self.spec.table is not None
         lead = self.spec.subtitle if not subtitle_written else ""
         paras_exist = bool(self.spec.bullets or lead)

@@ -89,7 +89,9 @@ def layout_table(grid: list[list[str]], header_n: int, width_emu: int, font_pt: 
     natural = [max(n, pad + font_pt) for n in natural]
     minimal = [max(m, pad + font_pt) for m in minimal]
     if sum(natural) <= W:
-        k = W / sum(natural)
+        # маленькая таблица не растягивается на всю зону: ≤ 1.4×естественной ширины, но ≥ половины зоны
+        target = min(W, max(0.5 * W, 1.4 * sum(natural)))
+        k = target / sum(natural)
         widths = [n * k for n in natural]
     elif sum(minimal) <= W:
         extra = W - sum(minimal)
@@ -101,7 +103,8 @@ def layout_table(grid: list[list[str]], header_n: int, width_emu: int, font_pt: 
         widths = [m * k for m in minimal]
     fits_width = sum(minimal) <= W + 0.01
     col_w = [int(w * EMU_PER_PT) for w in widths]
-    col_w[-1] += width_emu - sum(col_w)  # добиваем округление
+    total = min(width_emu, int(round(sum(widths) * EMU_PER_PT)))
+    col_w[-1] += total - sum(col_w)  # добиваем округление
     lh = metrics.line_height_pt(font_pt, TABLE_LN_SPC)
     row_h = []
     for ri, row in enumerate(grid):

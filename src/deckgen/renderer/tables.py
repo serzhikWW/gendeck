@@ -14,16 +14,23 @@ from deckgen.fitter.measure import is_numeric, layout_table, table_grid
 from deckgen.template.textstyle import CELL_MAR_LR_EMU, CELL_MAR_TB_EMU
 
 from .ops import end_para_size, style_run
+from .tablestyle import Line
 
 
 @dataclass
 class TableStyle:
+    """Всё в RRGGBB. Явные цвета пишутся в каждую ячейку (одинаково в Р7/LibreOffice/PowerPoint);
+    style_id остаётся в tblPr для редактирования."""
     style_id: Optional[str] = None      # tableStyleId из шаблона (convention: STYLE_TABLE)
-    header_text: Optional[str] = None   # RRGGBB; None = из стиля таблицы
+    header_text: Optional[str] = None
     header_fill: Optional[str] = None
-    band_fill: Optional[str] = None
-    border: Optional[str] = None        # горизонтальные линии между строками
     header_bold: bool = True
+    header_rule: Optional[Line] = None  # линия под шапкой
+    body_text: Optional[str] = None
+    band_fill: Optional[str] = None     # зебра (чётные строки тела)
+    grid: Optional[Line] = None         # все линии сетки
+    border: Optional[str] = None        # только горизонтальные линии (корп. стиль ИнтерРАО)
+    explicit: bool = True               # False — довериться tableStyleId (встроенный стиль Office)
 
 
 def _numeric_cols(grid: list[list[str]], header_n: int) -> list[bool]:
@@ -109,15 +116,33 @@ def fill_table(graphic_frame, spec: TableSpec, zone: BBox, font_pt: float, style
                 p.text = ptxt  # \v -> <a:br/>
                 p._p.get_or_add_pPr().set("algn", "r" if numeric[c] else "l")
                 for run in p.runs:
-                    style_run(run, font_pt, bold=True if (is_hdr and style.header_bold) else None,
-                              color=style.header_text if is_hdr else None)
+                    color = (style.header_text if is_hdr else style.body_text) if style.explicit else None
+                    style_run(run, font_pt, bold=True if (is_hdr and style.header_bold) else None, color=color)
                 end_para_size(p, font_pt)
-            if is_hdr and style.header_fill:
-                _set_fill(cell, style.header_fill)
-            elif not is_hdr and style.band_fill and (r - header_n) % 2 == 1:
-                _set_fill(cell, style.band_fill)
-            if style.border:
-                for side in ("lnL", "lnR"):
-                    _set_border(cell, side, None)
-                _set_border(cell, "lnT", style.border if r > 0 else None)
-                _set_border(cell, "lnB", style.border)
+            if style.explicit:
+                _paint(cell, r, header_n, len(grid), style)
+
+
+def _paint(cell, r: int, header_n: int, nrows: int, style: TableStyle) -> None:
+    is_hdr = r < header_n
+    if is_hdr and style.header_fill:
+        _set_fill(cell, style.header_fill)
+    elif not is_hdr and style.band_fill and (r - header_n) % 2 == 0:
+        _set_fill(cell, style.band_fill)   # band1H = 1-я, 3-я ... строки тела, как в PowerPoint
+    else:
+        cell.fill.background()             # явное «нет заливки», чтобы стиль не перекрасил
+    if style.grid:
+        for side in ("lnL", "lnR", "lnT", "lnB"):
+            _set_border(cell, side, style.grid.color, style.grid.w)
+    elif style.border:
+        for side in ("lnL", "lnR"):
+            _set_border(cell, side, None)
+        _set_border(cell, "lnT", style.border if r > 0 else None)
+        _set_border(cell, "lnB", style.border)
+    else:
+        for side in ("lnL", "lnR", "lnT", "lnB"):
+            _set_border(cell, side, None)
+    if style.header_rule and r == header_n - 1:
+        _set_border(cell, "lnB", style.header_rule.color, style.header_rule.w)
+    if style.header_rule and header_n and r == header_n:
+        _set_border(cell, "lnT", style.header_rule.color, style.header_rule.w)
